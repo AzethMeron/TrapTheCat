@@ -8,10 +8,15 @@ class Agent:
 	
 	def __neighbours(self, pos_row, pos_col):
 		rows, cols = self.board.size, self.board.size
+		d = [ (1,0), (0,1), (-1,0), (0,-1) ]
+		if pos_row % 2 == 0:
+			d.extend([ (1,-1), (-1,-1) ])
+		else:
+			d.extend( [ (-1,1), (1,1) ] )
 		neighbours = []
-		for dr, dc in [ (1,0), (0,1), (-1,0), (0,-1) ]:
+		for dr, dc in d:
 			new_row, new_col = pos_row + dr, pos_col + dc
-			if new_row >= 0 and new_row < rows and new_col >= 0 and new_col < cols:
+			if 0 <= new_row < rows and 0 <= new_col < cols:
 				if self.board.board[new_row][new_col] == constants.TILE_EMPTY:
 					neighbours.append( (new_row, new_col) )
 		return neighbours
@@ -93,7 +98,7 @@ class Agent:
 	def get_cat_move(self):
 		dmap, pmap = self.BFSCatDistance()
 		target_nodes, landlocked = self.FindClosestExit( dmap, pmap )
-		self.debug_print_dmap(dmap)
+		#self.debug_print_dmap(dmap)
 		if landlocked: return self.random_move()
 		
 		target = random.choice(target_nodes)
