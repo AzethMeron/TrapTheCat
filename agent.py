@@ -5,19 +5,9 @@ class Agent:
 	def __init__(self, board):
 		self.board = board
 	
-	def get_neighbours(self, pos_row, pos_col):
-		rows, cols = self.board.size, self.board.size
-		d = [ (1,0), (0,1), (-1,0), (0,-1) ]
-		if pos_row % 2 == 0:
-			d.extend([ (1,-1), (-1,-1) ])
-		else:
-			d.extend( [ (-1,1), (1,1) ] )
-		neighbours = []
-		for dr, dc in d:
-			new_row, new_col = pos_row + dr, pos_col + dc
-			if 0 <= new_row < rows and 0 <= new_col < cols:
-				if self.board.board[new_row][new_col] == constants.TILE_EMPTY:
-					neighbours.append( (new_row, new_col) )
+	def _neighbours(self, pos_row, pos_col):
+		neighbours = self.board.pos_neighbours(pos_row, pos_col)
+		neighbours = [ (row, col) for (row, col) in neighbours if self.board.board[row][col] == constants.TILE_EMPTY ]
 		return neighbours
 	
 	def __bfs_visit(self, prev_pos, pos, distance_map, previous_map, to_visit, visited):
@@ -36,7 +26,7 @@ class Agent:
 			distance_map[row][col] = distance
 			previous_map[row][col] = [ (prev_row, prev_col) ]
 		
-		to_visit.append( ((row, col), self.get_neighbours( row, col )))
+		to_visit.append( ((row, col), self._neighbours( row, col )))
 	
 	def BFSCatDistance(self):
 		rows, cols = self.board.size, self.board.size
@@ -46,7 +36,7 @@ class Agent:
 		distance_map[cat_row][cat_col] = 0 # this is where is the cat, so it takes 0 edge-traverses to get him there
 		visited = set()
 		
-		to_visit = [ ( (cat_row, cat_col), self.get_neighbours( cat_row, cat_col ) ) ]
+		to_visit = [ ( (cat_row, cat_col), self._neighbours( cat_row, cat_col ) ) ]
 		to_visit_next = []
 		
 		while to_visit:

@@ -36,18 +36,18 @@ class CatAgent(Agent):
 
     def random_move(self):
         cat_row, cat_col = self.board.cat_pos
-        neighbours = self.get_neighbours(cat_row, cat_col)
+        neighbours = self._neighbours(cat_row, cat_col)
         if neighbours:
             return random.choice(neighbours)
 
-    def debug_print_dmap(self, dmap):
+    def __debug_print_dmap(self, dmap):
         for r in range(self.board.size):
             print(" ".join([str(i) for i in dmap[r]]))
 
     def get_cat_move(self):
         dmap, pmap = self.BFSCatDistance()
         target_nodes, landlocked = self.FindClosestExit(dmap, pmap)
-        # self.debug_print_dmap(dmap)
+        # self.__debug_print_dmap(dmap)
         if landlocked: return self.random_move()
 
         target = random.choice(target_nodes)

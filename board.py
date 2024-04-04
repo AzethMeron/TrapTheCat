@@ -42,6 +42,20 @@ class Board:
                 v = math.sqrt((mouse_x - x) ** 2 + (mouse_y - y) ** 2)
                 if v <= S: return (row, col)
 
+    def pos_neighbours(self, row, col):
+        rows, cols = self.size, self.size
+        d = [(1, 0), (0, 1), (-1, 0), (0, -1)]
+        if row % 2 == 0:
+            d.extend([(1, -1), (-1, -1)])
+        else:
+            d.extend([(-1, 1), (1, 1)])
+        neighbours = []
+        for dr, dc in d:
+            new_row, new_col = row + dr, col + dc
+            if 0 <= new_row < rows and 0 <= new_col < cols:
+                neighbours.append((new_row, new_col))
+        return neighbours
+
     def get_slk(self):
         S = self.settings.screen_width / (self.settings.board_size * 2 + 1)
         L = S * 2 / math.sqrt(3)
@@ -93,14 +107,15 @@ class Board:
         return False
 
     def place_cat(self, row, col):  # return False if "wrong move"
-        if (row, col) not in self.cat_agent.get_neighbours(self.cat_pos[0], self.cat_pos[1]): return False
+        if (row, col) not in self.pos_neighbours(self.cat_pos[0], self.cat_pos[1]): return False
+        if self.board[row][col] != constants.TILE_EMPTY: return False
         self.board[self.cat_pos[0]][self.cat_pos[1]] = constants.TILE_EMPTY  # Usunięcie kota z poprzedniego miejsca
         self.cat_pos = (row, col)  # Aktualizacja pozycji kota
         self.board[row][col] = constants.TILE_CAT  # Umieszczenie kota na nowej pozycji
         return True
 
     def is_cat_trapped(self):
-        directions = self.cat_agent.get_neighbours( self.cat_pos[0], self.cat_pos[1] )  # Góra, Prawo, Dół, Lewo
+        directions = self.pos_neighbours( self.cat_pos[0], self.cat_pos[1] )  # Góra, Prawo, Dół, Lewo
         for new_x, new_y in directions:
             if 0 <= new_x < self.size and 0 <= new_y < self.size and \
                     self.board[new_x][new_y] == constants.TILE_EMPTY:
@@ -111,7 +126,7 @@ class Board:
         x, y = self.cat_pos
         return x == 0 or x == self.size - 1 or y == 0 or y == self.size - 1
 
-    def debug_display(self):
+    def __debug_display(self):
         for rows in range(self.size):
             print(" ".join([str(i) for i in self.board[rows]]))
         print()
