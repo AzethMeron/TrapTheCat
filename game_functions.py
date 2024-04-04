@@ -12,9 +12,7 @@ def check_events(board, turn):
         elif event.type == pygame.MOUSEBUTTONDOWN and turn == constants.TURN_PLAYER:
             mouse_x, mouse_y = pygame.mouse.get_pos()
             target = board.mouse_click(mouse_x, mouse_y)
-            if target:
-                row, col = target
-                board.place_trap(row, col)
+            if target and board.place_trap(target[0], target[1]):
                 turn = constants.TURN_CAT  # Zmiana tury na kota
     return turn
 
