@@ -40,4 +40,8 @@ Do uruchomienia wykorzystać należy plik ```main.py```, np. ```python main.py``
 MODE_LEARNING i MODE_FROZEN wykorzystują Deep Q-Learning do sterowania agentem. MODE_FROZEN wyłącza uczenie.
 MODE_GREEDY wykorzystuje algorytm zachłanny.
 MODE_MANUAL pozwala na ręczne sterowanie danym agentem.
+[39] initial_traps = 20 # Integer. Poczatkowa liczba losowo generowanych pułapek
+[40,41] min_traps, max_traps # Integer. Dolna i górna granica dla liczby generowanych losowo pułapek.
 ```
+
+Wymiary planszy, a także niektóre parametry dotyczące wizualizacji można dostosować w pliku ```settings.py```.
