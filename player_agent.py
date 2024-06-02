@@ -13,9 +13,10 @@ import os
 class QNetwork(nn.Module):
     def __init__(self, input_dim, output_dim, freeze=False):
         super(QNetwork, self).__init__()
-        self.fc1 = nn.Linear(input_dim, 64)
-        self.fc2 = nn.Linear(64, 64)
-        self.fc3 = nn.Linear(64, output_dim)
+        self.fc1 = nn.Linear(input_dim, input_dim)
+        self.fc2 = nn.Linear(input_dim, input_dim)
+        self.fc3 = nn.Linear(input_dim, input_dim)
+        self.fc4 = nn.Linear(input_dim, output_dim)
         if freeze:
             for param in self.parameters():
                 param.requires_grad = False
@@ -23,18 +24,18 @@ class QNetwork(nn.Module):
     def forward(self, x):
         x = torch.relu(self.fc1(x))
         x = torch.relu(self.fc2(x))
-        x = self.fc3(x)
+        x = torch.relu(self.fc3(x))
+        x = self.fc4(x)
         return x
-
-class CatAgent(Agent):
+class PlayerAgent(Agent):
     def __init__(self, board, filename=None, learning_rate=0.001, discount_factor=0.95, epsilon=0.2):
         super().__init__(board)
         self.filename = filename
         self.epsilon = epsilon
         self.learning_rate = learning_rate
         self.discount_factor = discount_factor
-        self.q_network = QNetwork(self.board.size * self.board.size, 6)
-        self.target_network = QNetwork(self.board.size * self.board.size, 6, freeze=True)
+        self.q_network = QNetwork(self.board.size * self.board.size, self.board.size * self.board.size)
+        self.target_network = QNetwork(self.board.size * self.board.size, self.board.size * self.board.size, freeze=True)
         self.update_target_network()
         self.optimizer = optim.Adam(self.q_network.parameters(), lr=self.learning_rate)
         self.loss_fn = nn.MSELoss()
@@ -55,15 +56,18 @@ class CatAgent(Agent):
             self.q_network.load_state_dict(torch.load(self.filename))
 
     def choose_action(self, state):
+        dmap, pmap = self.BFSCatDistance()
         if np.random.rand() < self.epsilon:
-            return np.random.randint(6)
+            return np.random.randint(self.board.size * self.board.size)
         else:
             with torch.no_grad():
                 state_tensor = torch.tensor(state, dtype=torch.float32)
                 q_values = self.q_network(state_tensor)
-                for action, legal in enumerate(self.check_legality_of_moves(self.board.cat_pos)):
-                    if not legal:
-                        q_values[action] = constants.NEGATIVE_INF
+                for row in range(self.board.size):
+                    for col in range(self.board.size):
+                        idx = row + self.board.size*col
+                        if dmap[row][col] == constants.DISTANCE_UNREACHABLE or not self.board.is_empty((row, col)):
+                            q_values[idx] = constants.NEGATIVE_INF
                 return torch.argmax(q_values).item()
 
     def store_transition(self, state, action, reward, next_state, done):
@@ -107,47 +111,33 @@ class CatAgent(Agent):
         current_pos = self.board.cat_pos
         state = np.array(self.board.board).flatten("F")
         action = self.choose_action(state)
-        new_pos = self.move_based_on_action(current_pos, action)
+        new_pos = self.move_based_on_action(action)
         reward = self.calculate_reward(new_pos)
         new_state = np.array(self.board.board).flatten("F")
-        done = self.board.is_exit(new_pos)
+        done = self.board.is_cat_trapped()
         if mode == constants.MODE_LEARNING: self.store_transition(state, action, reward, new_state, done)
         if mode == constants.MODE_LEARNING: self.learn()
         return new_pos
 
-    def check_legality_of_moves(self, pos):
-        row, col = pos
-        output = []
-        if row % 2 == 0:  # Parzysty wiersz
-            delta = [(-1, -1), (-1, 0), (0, 1), (1, 0), (1, -1), (0, -1)] #[(-1, 0), (-1, 1), (0, 1), (1, 1), (1, 0), (0, -1)]
-        else:  # Nieparzysty wiersz
-            delta = [(-1, 0), (-1, 1), (0, 1), (1, 1), (1, 0), (0, -1)] # [(-1, -1), (-1, 0), (0, 1), (1, 0), (1, -1), (0, -1)]
-        for (dr, dc) in delta:
-            new_row = row + dr
-            new_col = col + dc
-            if self.board.is_empty( (new_row, new_col) ):
-                output.append(True)
-            else:
-                output.append(False)
-        return output
-
-    def move_based_on_action(self, pos, action):
-        row, col = pos
-        if row % 2 == 0:  # Parzysty wiersz
-            delta = [(-1, -1), (-1, 0), (0, 1), (1, 0), (1, -1), (0, -1)] #[(-1, 0), (-1, 1), (0, 1), (1, 1), (1, 0), (0, -1)]
-        else:  # Nieparzysty wiersz
-            delta = [(-1, 0), (-1, 1), (0, 1), (1, 1), (1, 0), (0, -1)] # [(-1, -1), (-1, 0), (0, 1), (1, 0), (1, -1), (0, -1)]
-        new_row = row + delta[action][0]
-        new_col = col + delta[action][1]
-        return (new_row, new_col)
+    def move_based_on_action(self, action):
+        row = action % self.board.size
+        col = action // self.board.size
+        return (row, col)
 
     def calculate_reward(self, new_pos):
-        if self.board.is_exit(new_pos):
+        old_dmap, old_pmap = self.BFSCatDistance()
+        _, _, old_closest_distance = self.FindClosestExit(old_dmap, old_dmap)
+
+        dummy_board = copy.deepcopy(self.board)
+        dummy_board.place_trap( new_pos[0], new_pos[1] )
+        dummy_agent = Agent(dummy_board)
+        dmap, pmap = dummy_agent.BFSCatDistance()
+        closest_nodes, landlocked, closest_distance = dummy_agent.FindClosestExit(dmap, pmap)
+
+        if self.board.is_cat_trapped() or landlocked:
             return 500
-        elif self.board.is_empty(new_pos):
-            return -1
         else:
-            return -10
+            return closest_distance - old_closest_distance - 10
 
     def get_move(self, mode):
         if mode == constants.MODE_GREEDY:
@@ -158,28 +148,39 @@ class CatAgent(Agent):
             return self.get_move_q_learning(mode)
         raise RuntimeError(f"Unsupported mode {mode}")
 
-    def random_move(self):
-        cat_row, cat_col = self.board.cat_pos
-        neighbours = self._neighbours(cat_row, cat_col)
-        if neighbours:
-            return random.choice(neighbours)
-
-    def get_move_greedy(self):
-        dmap, pmap = self.BFSCatDistance()
-        target_nodes, landlocked, _ = self.FindClosestExit(dmap, pmap)
-        # self.__debug_print_dmap(dmap)
-        if landlocked: return self.random_move()
-
-        target = random.choice(target_nodes)
-        while True:
-            prev = random.choice(pmap[target[0]][target[1]])
-            if prev == self.board.cat_pos:
-                return target
-            target = prev
-
     def get_move_manual(self):
-        cat_row, cat_col = self.board.cat_pos
-        neighbours = self._neighbours(cat_row, cat_col)
-        target = gf.check_events(self.board, constants.TURN_PLAYER)
-        if target in neighbours: return target
-        return None
+        return gf.check_events(self.board, constants.TURN_PLAYER)
+
+    def _get_weight(self, n, row, col, original_dmap, original_pmap):
+        board = copy.deepcopy(self.board)
+        board.place_trap(row, col)
+        tmp_agent = Agent(board)
+        dmap, pmap = tmp_agent.BFSCatDistance()
+        exits = [ (row, col) for row in range(self.board.size) for col in [0, self.board.size-1] ] + [ (row, col) for col in range(self.board.size) for row in [0, self.board.size-1] ]
+        exits = [ (row, col, dmap[row][col]) for (row, col) in exits  ]
+        random.shuffle(exits)
+        exits = sorted( exits, key=lambda x: x[2] )
+        weight = sum( [ w for (r,c,w) in exits[:n] ] ) / n
+        return (row, col, weight)
+
+    def get_move_greedy(self, n = 5):
+        dmap, pmap = self.BFSCatDistance()
+        _, landlocked, _ = self.FindClosestExit(dmap, pmap)
+        if not landlocked:
+            parameters = [ (row, col) for row in range(self.board.size) for col in range(self.board.size) if self.board.is_empty( (row, col) ) and dmap[row][col] < self.board.size]
+            results = [ self._get_weight(n, row, col, dmap, pmap) for (row, col) in parameters ]
+            results = sorted(results, key=lambda x: -x[2])
+            results = [ (row, col, weight) for (row, col, weight) in results if weight == results[0][2] ]
+            results = sorted(results, key=lambda x: dmap[x[0]][x[1]])
+            return results[0][0], results[0][1]
+        else:
+            return random.choice( self.board.pos_neighbours( self.board.cat_pos[0], self.board.cat_pos[1] ) )
+
+    def get_move(self, mode):
+        if mode == constants.MODE_GREEDY:
+            return self.get_move_greedy()
+        elif mode == constants.MODE_MANUAL:
+            return self.get_move_manual()
+        elif mode in [constants.MODE_LEARNING, constants.MODE_FROZEN]:
+            return self.get_move_q_learning(mode)
+        raise RuntimeError(f"Unsupported mode {mode}")

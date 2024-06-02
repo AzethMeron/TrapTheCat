@@ -1,32 +1,42 @@
 # Klasa reprezentująca planszę gry - umieszczanie planszy, kota, pułapek
 
-import pygame
-from pygame.sprite import Sprite
 import random
 import math
-
 import pygame
-
 import constants
-import cat_agent
-
+import numpy as np
 
 class Board:
-    def __init__(self, ai_settings, screen):
+    def __init__(self, settings, screen, random_traps = 10):
         self.screen = screen
-        self.settings = ai_settings
+        self.settings = settings
         self.size = self.settings.board_size
         self.board = [[constants.TILE_EMPTY for _ in range(self.size)] for _ in range(self.size)]
         self.cat_pos = (self.size // 2, self.size // 2)
-        self.board[self.cat_pos[0]][self.cat_pos[1]] = constants.TILE_CAT  # 2 reprezentuje kota na planszy
-        self.cat_agent = cat_agent.CatAgent(self)
+        self.board[self.cat_pos[0]][self.cat_pos[1]] = constants.TILE_CAT  # Kot umieszczony na środku planszy
+        self.mask = np.ones( (self.size, self.size) )
+        self.init_traps(random_traps)  # Dodanie zablokowanych pól w losowych miejscach
 
         S, L, K = self.get_slk()
 
-        # Ładowanie obrazka kota
+        # Ładowanie obrazka kota\
         self.cat_image = pygame.image.load('images/cat.png')
         self.cat_image = pygame.transform.scale(self.cat_image,
                                                 (2 * S, 2 * K))  # Skalowanie obrazka do rozmiaru kafelka
+
+    def __getstate__(self):
+        screen, cat_image = self.screen, self.cat_image
+        self.screen, self.cat_image = None, None
+        state = self.__dict__.copy()
+        self.screen, self.cat_image = screen, cat_image
+        return state
+
+    def init_traps(self, num_traps):
+        placed_traps = 0
+        while placed_traps < num_traps:
+            row = random.randint(0, self.size - 1)
+            col = random.randint(0, self.size - 1)
+            if self.place_trap(row,col): placed_traps += 1
 
     def mouse_click(self, mouse_x, mouse_y):
         # parameters for hexagonal grid, no standards here
@@ -103,6 +113,7 @@ class Board:
     def place_trap(self, row, col):  # return False if "wrong move"
         if self.board[row][col] == constants.TILE_EMPTY:
             self.board[row][col] = constants.TILE_TRAP
+            self.mask[row][col] = 0
             return True
         return False
 
@@ -110,6 +121,8 @@ class Board:
         if (row, col) not in self.pos_neighbours(self.cat_pos[0], self.cat_pos[1]): return False
         if self.board[row][col] != constants.TILE_EMPTY: return False
         self.board[self.cat_pos[0]][self.cat_pos[1]] = constants.TILE_EMPTY  # Usunięcie kota z poprzedniego miejsca
+        self.mask[self.cat_pos[0]][self.cat_pos[1]] = 1
+        self.mask[row][col] = 0
         self.cat_pos = (row, col)  # Aktualizacja pozycji kota
         self.board[row][col] = constants.TILE_CAT  # Umieszczenie kota na nowej pozycji
         return True
@@ -131,8 +144,19 @@ class Board:
             print(" ".join([str(i) for i in self.board[rows]]))
         print()
 
+    """
     def move_cat(self):
         target = self.cat_agent.get_cat_move()
         if target:
             new_x, new_y = target
             self.place_cat(new_x, new_y)
+            """
+
+    def is_exit(self, pos):
+        row, col = pos
+        return row == 0 or row == self.size - 1 or col == 0 or col == self.size - 1
+
+    def is_empty(self, pos):
+        row, col = pos
+        return self.board[row][col] == constants.TILE_EMPTY
+
