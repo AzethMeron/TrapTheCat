@@ -13,6 +13,10 @@ Autorzy:
 * Jakub Grzana 241530
 * Julia Rzepka 253119
 
+## Deep Q-Learning
+
+DQL jest modyfikacją algorytmu Q-Learningu, który zastępuje Q-table <i>(czyli tablice opisującą, jaką akcje należy podjąc dla danego stanu)</i> siecią neuronową, co pozwala na nauczenie agenta do podejmowania decyzji w niestacjonarnym <i>(zmiennym)</i> środowisku.
+
 ## Prezentacja
 https://github.com/AzethMeron/TrapTheCat/assets/41695668/809351de-cf95-4876-ac87-a3931638ad8f
 
